@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnnualBudget, MonthlyData, BudgetEntry } from './types';
 import { MONTHS, INCOME_CATEGORIES, EXPENSE_CATEGORIES, CURRENCY_FORMATTER } from './constants';
 import BudgetTable from './components/BudgetTable';
@@ -36,11 +36,48 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'month' | 'year'>('month');
   const [isMounted, setIsMounted] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Função para comprimir os dados em uma estrutura mínima (link reduzido)
+  // --- SINCRONIZAÇÃO E ARQUIVOS ---
+
+  // Exportar para arquivo (O usuário salva no seu Google Drive localmente)
+  const exportToDrive = () => {
+    const dataStr = JSON.stringify(budget, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+    const exportFileDefaultName = `Controle_Financeiro_${CURRENT_YEAR}_Backup.json`;
+
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+  };
+
+  // Importar de arquivo
+  const importFromDrive = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const fileReader = new FileReader();
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    fileReader.readAsText(files[0], "UTF-8");
+    fileReader.onload = e => {
+      try {
+        const target = e.target;
+        if (!target) return;
+        const result = JSON.parse(target.result as string);
+        if (result[CURRENT_YEAR]) {
+          if (window.confirm("Deseja carregar este backup? Seus dados atuais serão substituídos.")) {
+            setBudget(result);
+          }
+        }
+      } catch (err) {
+        alert("Erro ao ler o arquivo de backup.");
+      }
+    };
+  };
+
+  // Gerar Link de Compartilhamento (Visualização em outros dispositivos)
   const handleShare = () => {
     try {
-      // Estrutura compacta: [ [mês, [[catIdx, desc, valor],...], [[catIdx, desc, valor],...]], ... ]
       const compactData = budget[CURRENT_YEAR]
         .filter(m => m.income.length > 0 || m.expenses.length > 0)
         .map(m => [
@@ -50,7 +87,6 @@ const App: React.FC = () => {
         ]);
 
       const dataString = JSON.stringify(compactData);
-      // Usando btoa para codificar. Para links ainda menores, removemos espaços desnecessários do JSON.
       const encodedData = btoa(encodeURIComponent(dataString));
       const shareUrl = `${window.location.origin}${window.location.pathname}#v2=${encodedData}`;
       
@@ -59,22 +95,19 @@ const App: React.FC = () => {
         setTimeout(() => setShowToast(false), 3000);
       });
     } catch (e) {
-      alert("Erro ao gerar link reduzido. Tente remover alguns lançamentos antigos.");
+      alert("Erro ao gerar link. Os dados podem estar muito extensos.");
     }
   };
 
   useEffect(() => {
     setIsMounted(true);
-    
     const hash = window.location.hash;
     
-    // Suporte para a nova versão compacta (v2)
     if (hash.startsWith('#v2=')) {
       try {
         const encodedData = hash.replace('#v2=', '');
         const decodedData = decodeURIComponent(atob(encodedData));
         const compactData = JSON.parse(decodedData) as any[];
-        
         const newBudget: AnnualBudget = JSON.parse(JSON.stringify(INITIAL_BUDGET));
         
         compactData.forEach(([monthIdx, incomeArr, expenseArr]) => {
@@ -82,52 +115,33 @@ const App: React.FC = () => {
           if (mIdx !== -1) {
             newBudget[CURRENT_YEAR][mIdx].income = incomeArr.map(([catIdx, desc, val]: any) => ({
               id: crypto.randomUUID(),
-              category: INCOME_CATEGORIES[catIdx] || INCOME_CATEGORIES[0],
+              category: INCOME_CATEGORIES[catIdx] !== undefined ? INCOME_CATEGORIES[catIdx] : catIdx,
               description: desc,
               amount: val
             }));
             newBudget[CURRENT_YEAR][mIdx].expenses = expenseArr.map(([catIdx, desc, val]: any) => ({
               id: crypto.randomUUID(),
-              category: EXPENSE_CATEGORIES[catIdx] || EXPENSE_CATEGORIES[0],
+              category: EXPENSE_CATEGORIES[catIdx] !== undefined ? EXPENSE_CATEGORIES[catIdx] : catIdx,
               description: desc,
               amount: val
             }));
           }
         });
 
-        const confirmImport = window.confirm("Dados compactos detectados! Deseja carregar esta versão sincronizada?");
+        const confirmImport = window.confirm("Deseja visualizar os dados recebidos via link?");
         if (confirmImport) {
           setBudget(newBudget);
           window.history.replaceState(null, "", window.location.pathname);
           return;
         }
-      } catch (e) {
-        console.error("Erro ao processar link reduzido v2");
-      }
+      } catch (e) { console.error("Erro importação v2", e); }
     }
 
-    // Suporte legado (v1) para não quebrar links antigos já gerados
-    if (hash.startsWith('#data=')) {
-      try {
-        const encodedData = hash.replace('#data=', '');
-        const decodedData = decodeURIComponent(atob(encodedData));
-        const parsedBudget = JSON.parse(decodedData);
-        if (parsedBudget[CURRENT_YEAR]) {
-          setBudget(parsedBudget);
-          window.history.replaceState(null, "", window.location.pathname);
-          return;
-        }
-      } catch (e) {}
-    }
-
-    // Carregar do LocalStorage se não houver link
     try {
       const saved = localStorage.getItem('budget_data_v1');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed[CURRENT_YEAR]) {
-          setBudget(parsed);
-        }
+        if (parsed[CURRENT_YEAR]) setBudget(parsed);
       }
     } catch (e) {}
   }, []);
@@ -190,14 +204,16 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
+      {/* Toast */}
       {showToast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-3 rounded-full text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-2">
           <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-          Link reduzido copiado!
+          Link de Sincronização Copiado!
         </div>
       )}
 
-      <header className="bg-indigo-700 text-white shadow-lg sticky top-0 z-50 backdrop-blur-xl bg-opacity-90 border-b border-indigo-600/50">
+      {/* Header */}
+      <header className="bg-indigo-700 text-white shadow-lg sticky top-0 z-50 backdrop-blur-xl bg-opacity-95 border-b border-indigo-600/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="p-2 bg-white/20 rounded-xl shrink-0">
@@ -207,49 +223,74 @@ const App: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <h1 className="text-lg font-black tracking-tight leading-tight">Controle de Despesas e Orçamento {CURRENT_YEAR}</h1>
-              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Gestão Patrimonial</p>
+              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Gestão Patrimonial Cloud</p>
             </div>
-            <button 
-              onClick={handleShare}
-              className="ml-2 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-all shadow-md active:scale-90"
-              title="Gerar Link Reduzido"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-              </svg>
-            </button>
           </div>
 
-          <div className="flex bg-black/10 p-1 rounded-2xl w-full sm:w-auto">
-            <button
-              onClick={() => setActiveTab('month')}
-              className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'month' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button 
+              onClick={handleShare}
+              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-xs font-black shadow-lg transition-all active:scale-95"
             >
-              MÊS
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+              SINCRONIZAR LINK
             </button>
-            <button
-              onClick={() => setActiveTab('year')}
-              className={`flex-1 sm:flex-none px-6 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'year' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}
-            >
-              ANO
-            </button>
+            <div className="flex bg-black/10 p-1 rounded-2xl">
+              <button
+                onClick={() => setActiveTab('month')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'month' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}
+              >
+                MÊS
+              </button>
+              <button
+                onClick={() => setActiveTab('year')}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'year' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}
+              >
+                ANO
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full flex-1 mb-12">
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-8 flex items-start gap-3">
-          <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <div className="flex flex-col gap-1">
-            <p className="text-xs text-amber-800 font-bold leading-relaxed">Sincronização via Link Reduzido</p>
-            <p className="text-[11px] text-amber-700 leading-relaxed">
-              Otimizamos o compartilhamento! Agora os links são menores e mais rápidos. Clique no ícone verde de compartilhar no topo para enviar sua versão atualizada.
-            </p>
+        {/* Cloud Sync Tools */}
+        <div className="bg-white rounded-[24px] p-5 shadow-sm border border-slate-200/60 mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-indigo-50 rounded-full">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
+            </div>
+            <div>
+              <p className="text-xs font-black text-slate-700 uppercase tracking-tight">Backup e Drive</p>
+              <p className="text-[10px] text-slate-400 font-medium">Salve seus dados permanentemente no seu Google Drive</p>
+            </div>
+          </div>
+          <div className="flex gap-2 w-full md:w-auto">
+            <button 
+              onClick={exportToDrive}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-[10px] font-black hover:bg-black transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+              SALVAR NO DRIVE
+            </button>
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-slate-200 text-slate-600 rounded-xl text-[10px] font-black hover:bg-slate-50 transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+              ABRIR DO DRIVE
+            </button>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={importFromDrive} 
+              accept=".json" 
+              className="hidden" 
+            />
           </div>
         </div>
 
+        {/* Resumo cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
             <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Entradas Anuais</p>
