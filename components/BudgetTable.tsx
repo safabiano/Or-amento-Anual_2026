@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { BudgetEntry, Category } from '../types';
+import { BudgetEntry } from '../types';
 import { CURRENCY_FORMATTER } from '../constants';
 
 interface BudgetTableProps {
@@ -14,12 +14,31 @@ interface BudgetTableProps {
 
 const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, type, onAdd, onDelete }) => {
   const [newEntry, setNewEntry] = useState({ category: categories[0], description: '', amount: 0 });
+  const [customCategory, setCustomCategory] = useState('');
+  const [isCustom, setIsCustom] = useState(false);
+
+  const handleCategoryChange = (val: string) => {
+    if (val === 'NEW_CUSTOM') {
+      setIsCustom(true);
+      setNewEntry({ ...newEntry, category: '' });
+    } else {
+      setIsCustom(false);
+      setNewEntry({ ...newEntry, category: val });
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (newEntry.description && newEntry.amount > 0) {
-      onAdd(newEntry);
+    const finalCategory = isCustom ? customCategory : newEntry.category;
+    
+    if (finalCategory && newEntry.description && newEntry.amount > 0) {
+      onAdd({
+        ...newEntry,
+        category: finalCategory
+      });
       setNewEntry({ category: categories[0], description: '', amount: 0 });
+      setCustomCategory('');
+      setIsCustom(false);
     }
   };
 
@@ -53,18 +72,41 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, t
         <form onSubmit={handleSubmit} className="flex flex-col gap-3 mb-6">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             <div className="relative">
-              <select
-                value={newEntry.category}
-                onChange={(e) => setNewEntry({ ...newEntry, category: e.target.value })}
-                className="w-full rounded-xl bg-blue-50 border-transparent text-sm text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all h-12 px-4 shadow-inner appearance-none"
-              >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
-              </div>
+              {!isCustom ? (
+                <>
+                  <select
+                    value={newEntry.category}
+                    onChange={(e) => handleCategoryChange(e.target.value)}
+                    className="w-full rounded-xl bg-blue-50 border-transparent text-sm text-slate-700 font-medium focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all h-12 px-4 shadow-inner appearance-none"
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="NEW_CUSTOM" className="text-indigo-600 font-bold">+ Nova Categoria...</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                  </div>
+                </>
+              ) : (
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Qual categoria?"
+                    autoFocus
+                    value={customCategory}
+                    onChange={(e) => setCustomCategory(e.target.value)}
+                    className="w-full rounded-xl bg-indigo-50 border-indigo-200 border text-sm text-slate-700 font-bold placeholder-indigo-300 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all h-12 px-4 shadow-inner pr-10"
+                  />
+                  <button 
+                    type="button"
+                    onClick={() => setIsCustom(false)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-rose-500"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              )}
             </div>
             <input
               type="text"
@@ -106,7 +148,9 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, t
               <tbody className="divide-y divide-slate-100">
                 {entries.map((entry) => (
                   <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-4 font-bold text-slate-600 whitespace-nowrap text-xs">{entry.category}</td>
+                    <td className="px-4 py-4 font-bold text-slate-600 whitespace-nowrap text-xs">
+                      <span className="inline-block px-2 py-0.5 bg-slate-100 rounded-md">{entry.category}</span>
+                    </td>
                     <td className="px-4 py-4 text-slate-500 min-w-[120px] text-xs font-medium">{entry.description}</td>
                     <td className="px-4 py-4 text-right font-black text-slate-800 whitespace-nowrap text-xs">{CURRENCY_FORMATTER.format(entry.amount)}</td>
                     <td className="px-4 py-4 text-right">
