@@ -18,7 +18,7 @@ import {
   Cell
 } from 'recharts';
 
-const CURRENT_YEAR = 2024;
+const CURRENT_YEAR = 2026;
 
 const INITIAL_BUDGET: AnnualBudget = {
   [CURRENT_YEAR]: Array.from({ length: 12 }, (_, i) => ({
@@ -129,8 +129,8 @@ const App: React.FC = () => {
               </svg>
             </div>
             <div className="flex flex-col">
-              <h1 className="text-lg font-black tracking-tight leading-tight">FinancialPro {CURRENT_YEAR}</h1>
-              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Dashboard Financeiro</p>
+              <h1 className="text-lg font-black tracking-tight leading-tight">Controle de Despesas e Orçamento {CURRENT_YEAR}</h1>
+              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Gestão Patrimonial</p>
             </div>
           </div>
 
@@ -263,7 +263,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-12 text-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
-        FinancialPro &copy; {new Date().getFullYear()}
+        Controle de Despesas e Orçamento &copy; {CURRENT_YEAR}
       </footer>
     </div>
   );
