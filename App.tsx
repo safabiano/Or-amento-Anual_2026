@@ -156,7 +156,7 @@ const App: React.FC = () => {
 
         {activeTab === 'month' ? (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* Month Selector - Native-like touch scroll */}
+            {/* Month Selector */}
             <div className="relative group">
               <div className="flex overflow-x-auto gap-2 pb-4 pt-1 px-1 scrollbar-hide snap-x touch-pan-x">
                 {MONTHS.map((name, idx) => (
@@ -176,7 +176,7 @@ const App: React.FC = () => {
               <div className="absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-slate-50 to-transparent pointer-events-none sm:hidden"></div>
             </div>
 
-            {/* Monthly Insights Section */}
+            {/* AI Insights Section */}
             <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-5 sm:p-8 rounded-2xl border border-indigo-100 flex flex-col md:flex-row items-center gap-6 shadow-inner">
               <div className="flex-1 text-center md:text-left">
                 <h3 className="text-base sm:text-lg font-black text-indigo-900 mb-2 flex items-center justify-center md:justify-start gap-2">
@@ -228,15 +228,15 @@ const App: React.FC = () => {
               />
             </div>
 
-            {/* Monthly Chart Container */}
+            {/* Monthly Chart */}
             {expenseByCategory.length > 0 && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                 <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
                   <div className="w-2 h-6 bg-indigo-500 rounded-full"></div>
                   Onde foi o dinheiro?
                 </h3>
-                <div className="w-full relative" style={{ height: '350px', minHeight: '350px' }}>
-                  <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                <div className="w-full relative min-h-[300px]" style={{ height: '350px' }}>
+                  <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={100}>
                     <PieChart>
                       <Pie
                         data={expenseByCategory}
@@ -265,14 +265,14 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Annual Chart Container */}
+            {/* Annual Chart */}
             <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <h3 className="text-lg sm:text-xl font-black text-slate-800 mb-6 sm:mb-8 flex items-center gap-2">
                  <div className="w-2 h-6 bg-indigo-500 rounded-full"></div>
                  Evolução Anual
               </h3>
-              <div className="w-full relative" style={{ height: '400px', minHeight: '400px' }}>
-                <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+              <div className="w-full relative min-h-[300px]" style={{ height: '400px' }}>
+                <ResponsiveContainer width="100%" height="100%" minWidth={0} debounce={100}>
                   <BarChart data={annualSummary} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis 
