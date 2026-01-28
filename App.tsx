@@ -3,7 +3,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { AnnualBudget, MonthlyData, BudgetEntry } from './types';
 import { MONTHS, INCOME_CATEGORIES, EXPENSE_CATEGORIES, CURRENCY_FORMATTER } from './constants';
 import BudgetTable from './components/BudgetTable';
-import { getFinancialInsights } from './services/geminiService';
 import {
   BarChart,
   Bar,
@@ -41,7 +40,7 @@ const App: React.FC = () => {
 
   // Função utilitária para mesclar dois orçamentos sem duplicar entradas por ID
   const mergeBudgets = (current: AnnualBudget, incoming: AnnualBudget): AnnualBudget => {
-    const merged = JSON.parse(JSON.stringify(current)); // Deep clone
+    const merged = JSON.parse(JSON.stringify(current));
     
     Object.keys(incoming).forEach((yearStr) => {
       const year = parseInt(yearStr);
@@ -55,12 +54,10 @@ const App: React.FC = () => {
         if (targetMonthIdx === -1) {
           merged[year].push(monthData);
         } else {
-          // Mesclar Incomes
           monthData.income.forEach(incomingIncome => {
             const exists = merged[year][targetMonthIdx].income.some((i: BudgetEntry) => i.id === incomingIncome.id);
             if (!exists) merged[year][targetMonthIdx].income.push(incomingIncome);
           });
-          // Mesclar Expenses
           monthData.expenses.forEach(incomingExpense => {
             const exists = merged[year][targetMonthIdx].expenses.some((e: BudgetEntry) => e.id === incomingExpense.id);
             if (!exists) merged[year][targetMonthIdx].expenses.push(incomingExpense);
@@ -72,13 +69,10 @@ const App: React.FC = () => {
     return merged;
   };
 
-  // --- SINCRONIZAÇÃO E ARQUIVOS ---
-
   const exportToDrive = () => {
     const dataStr = JSON.stringify(budget, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const exportFileDefaultName = `Controle_Financeiro_${CURRENT_YEAR}_Backup.json`;
-
     const linkElement = document.createElement('a');
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
@@ -98,22 +92,16 @@ const App: React.FC = () => {
         const result = JSON.parse(target.result as string);
         if (result[CURRENT_YEAR]) {
           const choice = window.confirm(
-            "Backup carregado!\n\nClique em OK para MESCLAR (manter dados atuais e adicionar os do arquivo).\nClique em CANCELAR se desejar apenas SUBSTITUIR (apaga tudo e usa só o arquivo)."
+            "Backup carregado!\n\nOK: MESCLAR (Adiciona novos dados mantendo os atuais).\nCANCELAR: SUBSTITUIR (Apaga tudo e usa o arquivo)."
           );
-          
           if (choice) {
             setBudget(prev => mergeBudgets(prev, result));
-          } else {
-            if (window.confirm("Certeza que deseja SUBSTITUIR? Isso apagará seus dados atuais não salvos.")) {
-              setBudget(result);
-            }
+          } else if (window.confirm("Certeza que deseja SUBSTITUIR tudo?")) {
+            setBudget(result);
           }
         }
-      } catch (err) {
-        alert("Erro ao ler o arquivo de backup.");
-      }
+      } catch (err) { alert("Erro ao ler o arquivo."); }
     };
-    // Reset input para permitir carregar o mesmo arquivo novamente se necessário
     event.target.value = '';
   };
 
@@ -126,31 +114,25 @@ const App: React.FC = () => {
           m.income.map(i => [INCOME_CATEGORIES.indexOf(i.category), i.description, i.amount, i.paid ? 1 : 0, i.id]),
           m.expenses.map(e => [EXPENSE_CATEGORIES.indexOf(e.category), e.description, e.amount, e.paid ? 1 : 0, e.id])
         ]);
-
       const dataString = JSON.stringify(compactData);
       const encodedData = btoa(encodeURIComponent(dataString));
       const shareUrl = `${window.location.origin}${window.location.pathname}#v2=${encodedData}`;
-      
       navigator.clipboard.writeText(shareUrl).then(() => {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
       });
-    } catch (e) {
-      alert("Erro ao gerar link. Os dados podem estar muito extensos.");
-    }
+    } catch (e) { alert("Dados muito extensos para o link."); }
   };
 
   useEffect(() => {
     setIsMounted(true);
     const hash = window.location.hash;
     
-    // Processamento de Link de Sincronização
     if (hash.startsWith('#v2=')) {
       try {
         const encodedData = hash.replace('#v2=', '');
         const decodedData = decodeURIComponent(atob(encodedData));
         const compactData = JSON.parse(decodedData) as any[];
-        // Fix: corrected typo INITIAL_BU+DGET to INITIAL_BUDGET
         const incomingBudget: AnnualBudget = JSON.parse(JSON.stringify(INITIAL_BUDGET));
         
         compactData.forEach(([monthIdx, incomeArr, expenseArr]) => {
@@ -158,14 +140,14 @@ const App: React.FC = () => {
           if (mIdx !== -1) {
             incomingBudget[CURRENT_YEAR][mIdx].income = incomeArr.map(([catIdx, desc, val, paidStatus, id]: any) => ({
               id: id || crypto.randomUUID(),
-              category: INCOME_CATEGORIES[catIdx] !== undefined ? INCOME_CATEGORIES[catIdx] : (typeof catIdx === 'string' ? catIdx : 'Outros'),
+              category: INCOME_CATEGORIES[catIdx] ?? (typeof catIdx === 'string' ? catIdx : 'Outros'),
               description: desc,
               amount: val,
               paid: paidStatus === 1
             }));
             incomingBudget[CURRENT_YEAR][mIdx].expenses = expenseArr.map(([catIdx, desc, val, paidStatus, id]: any) => ({
               id: id || crypto.randomUUID(),
-              category: EXPENSE_CATEGORIES[catIdx] !== undefined ? EXPENSE_CATEGORIES[catIdx] : (typeof catIdx === 'string' ? catIdx : 'Outros'),
+              category: EXPENSE_CATEGORIES[catIdx] ?? (typeof catIdx === 'string' ? catIdx : 'Outros'),
               description: desc,
               amount: val,
               paid: paidStatus === 1
@@ -173,45 +155,47 @@ const App: React.FC = () => {
           }
         });
 
-        const choice = window.confirm(
-          "Dados recebidos via link!\n\nDeseja MESCLAR com seus dados atuais? (Recomendado)\nSe cancelar, os dados atuais serão SUBSTITUÍDOS."
-        );
-
+        const choice = window.confirm("Deseja MESCLAR os dados recebidos via link com seus dados atuais?");
         if (choice) {
           setBudget(prev => mergeBudgets(prev, incomingBudget));
-        } else {
-          if (window.confirm("Deseja SUBSTITUIR seus dados pelos do link?")) {
-            setBudget(incomingBudget);
-          }
+        } else if (window.confirm("Deseja SUBSTITUIR seus dados pelos do link?")) {
+          setBudget(incomingBudget);
         }
         window.history.replaceState(null, "", window.location.pathname);
       } catch (e) { console.error("Erro importação v2", e); }
     }
 
-    // Carregar dados salvos do LocalStorage
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
         const parsed = JSON.parse(saved);
-        if (parsed[CURRENT_YEAR]) {
-          setBudget(parsed);
-        }
-      }
-    } catch (e) {
-      console.warn("Nenhum dado prévio encontrado ou erro no parse.");
+        if (parsed[CURRENT_YEAR]) setBudget(parsed);
+      } catch (e) {}
     }
   }, []);
 
-  // Salvar sempre que o orçamento mudar
   useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(budget));
-    }
+    if (isMounted) localStorage.setItem(STORAGE_KEY, JSON.stringify(budget));
   }, [budget, isMounted]);
 
   const monthData = useMemo(() => {
     return budget[CURRENT_YEAR].find(m => m.month === currentMonth) || budget[CURRENT_YEAR][0];
   }, [budget, currentMonth]);
+
+  const monthSummary = useMemo(() => {
+    const incomeTotal = monthData.income.reduce((s, i) => s + i.amount, 0);
+    const incomePaid = monthData.income.filter(i => i.paid).reduce((s, i) => s + i.amount, 0);
+    const expenseTotal = monthData.expenses.reduce((s, e) => s + e.amount, 0);
+    const expensePaid = monthData.expenses.filter(e => e.paid).reduce((s, e) => s + e.amount, 0);
+
+    return {
+      incomeTotal,
+      incomePending: incomeTotal - incomePaid,
+      expenseTotal,
+      expensePending: expenseTotal - expensePaid,
+      balance: incomeTotal - expenseTotal
+    };
+  }, [monthData]);
 
   const annualSummary = useMemo(() => {
     return budget[CURRENT_YEAR].map(m => {
@@ -234,8 +218,7 @@ const App: React.FC = () => {
     setBudget(prev => {
       const newBudget = { ...prev };
       const monthIdx = newBudget[CURRENT_YEAR].findIndex(m => m.month === currentMonth);
-      const newEntry = { ...entry, id: crypto.randomUUID() };
-      newBudget[CURRENT_YEAR][monthIdx][type].push(newEntry);
+      newBudget[CURRENT_YEAR][monthIdx][type].push({ ...entry, id: crypto.randomUUID() });
       return { ...newBudget };
     });
   };
@@ -274,8 +257,8 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
       {showToast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-3 rounded-full text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-2">
-          <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-          Sincronização Ativa (Merge Seguro)!
+          <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/></svg>
+          Sincronização Ativa!
         </div>
       )}
 
@@ -289,145 +272,96 @@ const App: React.FC = () => {
             </div>
             <div className="flex flex-col">
               <h1 className="text-lg font-black tracking-tight leading-tight">Orçamento {CURRENT_YEAR}</h1>
-              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Proteção de Dados Ativa</p>
+              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Dados Seguros & Mesclagem</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <button 
-              onClick={handleShare}
-              className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-xs font-black shadow-lg transition-all active:scale-95"
-            >
+            <button onClick={handleShare} className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 rounded-xl text-xs font-black shadow-lg transition-all active:scale-95">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
               COPIAR LINK
             </button>
             <div className="flex bg-black/10 p-1 rounded-2xl">
-              <button
-                onClick={() => setActiveTab('month')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'month' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}
-              >
-                MÊS
-              </button>
-              <button
-                onClick={() => setActiveTab('year')}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'year' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}
-              >
-                ANO
-              </button>
+              <button onClick={() => setActiveTab('month')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'month' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}>MÊS</button>
+              <button onClick={() => setActiveTab('year')} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${activeTab === 'year' ? 'bg-white text-indigo-700 shadow-md' : 'text-indigo-50 hover:bg-white/5'}`}>ANO</button>
             </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full flex-1 mb-12">
-        <div className="bg-emerald-50 border border-emerald-200 rounded-[24px] p-5 shadow-sm mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="bg-white rounded-[24px] p-5 shadow-sm border border-slate-200/60 mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-full">
-              <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+            <div className="p-2 bg-indigo-50 rounded-full">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" /></svg>
             </div>
             <div>
-              <p className="text-xs font-black text-emerald-800 uppercase tracking-tight">Segurança Anti-Perda</p>
-              <p className="text-[10px] text-emerald-700 font-medium">Suas atualizações e backups agora oferecem opção de MESCLAR dados.</p>
+              <p className="text-xs font-black text-slate-700 uppercase tracking-tight">Persistência Permanente</p>
+              <p className="text-[10px] text-slate-400 font-medium">Seus dados são salvos localmente e podem ser exportados/mesclados.</p>
             </div>
           </div>
           <div className="flex gap-2 w-full md:w-auto">
-            <button 
-              onClick={exportToDrive}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-[10px] font-black hover:bg-black transition-all"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              SALVAR BACKUP
+            <button onClick={exportToDrive} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-800 text-white rounded-xl text-[10px] font-black hover:bg-black transition-all">
+              EXPORTAR BACKUP
             </button>
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-slate-200 text-slate-600 rounded-xl text-[10px] font-black hover:bg-slate-50 transition-all"
-            >
+            <button onClick={() => fileInputRef.current?.click()} className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-slate-200 text-slate-600 rounded-xl text-[10px] font-black hover:bg-slate-50 transition-all">
               ABRIR BACKUP
             </button>
             <input type="file" ref={fileInputRef} onChange={importFromDrive} accept=".json" className="hidden" />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
-            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Total Entradas</p>
-            <h2 className="text-2xl font-black text-emerald-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualIncome)}</h2>
-          </div>
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
-            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Total Saídas</p>
-            <h2 className="text-2xl font-black text-rose-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualExpenses)}</h2>
-          </div>
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
-            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saldo Geral</p>
-            <h2 className={`text-2xl font-black tracking-tighter ${totalAnnualBalance >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
-              {CURRENCY_FORMATTER.format(totalAnnualBalance)}
-            </h2>
-          </div>
-        </div>
-
         {activeTab === 'month' ? (
-          <div className="space-y-6 animate-in fade-in duration-500">
-            <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide snap-x">
+          <div className="animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+              <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <svg className="w-16 h-16 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+                </div>
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Entradas {MONTHS[currentMonth]}</p>
+                <h2 className="text-2xl font-black text-emerald-600 tracking-tighter">{CURRENCY_FORMATTER.format(monthSummary.incomeTotal)}</h2>
+                <p className="text-[10px] font-bold text-emerald-500/70 mt-1">A receber: {CURRENCY_FORMATTER.format(monthSummary.incomePending)}</p>
+              </div>
+              <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                  <svg className="w-16 h-16 text-rose-600" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                </div>
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saídas {MONTHS[currentMonth]}</p>
+                <h2 className="text-2xl font-black text-rose-600 tracking-tighter">{CURRENCY_FORMATTER.format(monthSummary.expenseTotal)}</h2>
+                <p className="text-[10px] font-bold text-rose-500/70 mt-1">Pendente: {CURRENCY_FORMATTER.format(monthSummary.expensePending)}</p>
+              </div>
+              <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
+                <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saldo Mensal</p>
+                <h2 className={`text-2xl font-black tracking-tighter ${monthSummary.balance >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
+                  {CURRENCY_FORMATTER.format(monthSummary.balance)}
+                </h2>
+                <p className="text-[10px] font-bold text-slate-400 mt-1">Status: {monthSummary.balance >= 0 ? 'Superávit' : 'Déficit'}</p>
+              </div>
+            </div>
+
+            <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide snap-x mb-6">
               {MONTHS.map((name, idx) => (
-                <button
-                  key={name}
-                  onClick={() => setCurrentMonth(idx)}
-                  className={`flex-shrink-0 px-6 py-3 rounded-2xl text-xs font-bold transition-all snap-start border ${
-                    currentMonth === idx 
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' 
-                    : 'bg-white text-slate-500 border-slate-200'
-                  }`}
-                >
+                <button key={name} onClick={() => setCurrentMonth(idx)} className={`flex-shrink-0 px-6 py-3 rounded-2xl text-xs font-bold transition-all snap-start border ${currentMonth === idx ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white text-slate-500 border-slate-200'}`}>
                   {name}
                 </button>
               ))}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <BudgetTable
-                title={`Entradas • ${MONTHS[currentMonth]}`}
-                type="income"
-                entries={monthData.income}
-                categories={INCOME_CATEGORIES}
-                onAdd={(entry) => handleAddEntry('income', entry)}
-                onDelete={(id) => handleDeleteEntry('income', id)}
-                onToggleStatus={(id) => handleToggleStatus('income', id)}
-              />
-              <BudgetTable
-                title={`Saídas • ${MONTHS[currentMonth]}`}
-                type="expense"
-                entries={monthData.expenses}
-                categories={EXPENSE_CATEGORIES}
-                onAdd={(entry) => handleAddEntry('expenses', entry)}
-                onDelete={(id) => handleDeleteEntry('expenses', id)}
-                onToggleStatus={(id) => handleToggleStatus('expenses', id)}
-              />
+              <BudgetTable title={`Entradas • ${MONTHS[currentMonth]}`} type="income" entries={monthData.income} categories={INCOME_CATEGORIES} onAdd={(e) => handleAddEntry('income', e)} onDelete={(id) => handleDeleteEntry('income', id)} onToggleStatus={(id) => handleToggleStatus('income', id)} />
+              <BudgetTable title={`Saídas • ${MONTHS[currentMonth]}`} type="expense" entries={monthData.expenses} categories={EXPENSE_CATEGORIES} onAdd={(e) => handleAddEntry('expenses', e)} onDelete={(id) => handleDeleteEntry('expenses', id)} onToggleStatus={(id) => handleToggleStatus('expenses', id)} />
             </div>
 
             {expenseByCategory.length > 0 && (
-              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200/60">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Composição do Mês</h3>
+              <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200/60 mt-8">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Distribuição de Gastos</h3>
                 <div className="w-full h-[350px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
-                      <Pie
-                        data={expenseByCategory}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={80}
-                        outerRadius={110}
-                        paddingAngle={8}
-                        dataKey="value"
-                        stroke="none"
-                      >
-                        {expenseByCategory.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
+                      <Pie data={expenseByCategory} cx="50%" cy="50%" innerRadius={80} outerRadius={110} paddingAngle={8} dataKey="value" stroke="none">
+                        {expenseByCategory.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
                       </Pie>
-                      <Tooltip 
-                        formatter={(v) => CURRENCY_FORMATTER.format(v as number)}
-                        contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
-                      />
+                      <Tooltip formatter={(v) => CURRENCY_FORMATTER.format(v as number)} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} />
                       <Legend verticalAlign="bottom" align="center" iconType="circle" />
                     </PieChart>
                   </ResponsiveContainer>
@@ -436,19 +370,33 @@ const App: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="space-y-6 animate-in fade-in duration-700">
+          <div className="animate-in fade-in duration-700">
+             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
+                  <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Total Anual Entradas</p>
+                  <h2 className="text-2xl font-black text-emerald-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualIncome)}</h2>
+                </div>
+                <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
+                  <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Total Anual Saídas</p>
+                  <h2 className="text-2xl font-black text-rose-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualExpenses)}</h2>
+                </div>
+                <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
+                  <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saldo Geral 2026</p>
+                  <h2 className={`text-2xl font-black tracking-tighter ${totalAnnualBalance >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
+                    {CURRENCY_FORMATTER.format(totalAnnualBalance)}
+                  </h2>
+                </div>
+              </div>
+
             <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200/60 overflow-hidden">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Fluxo Anual</h3>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Evolução do Patrimônio</h3>
               <div className="w-full h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={annualSummary} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10}} tickFormatter={(v) => `R$${v}`} />
-                    <Tooltip 
-                      formatter={(v) => CURRENCY_FORMATTER.format(v as number)}
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
-                    />
+                    <Tooltip formatter={(v) => CURRENCY_FORMATTER.format(v as number)} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }} />
                     <Legend iconType="circle" verticalAlign="top" align="right" />
                     <Bar dataKey="renda" name="Renda" fill="#10b981" radius={[6, 6, 0, 0]} barSize={24} />
                     <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={24} />
@@ -461,7 +409,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-12 text-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
-        Gestão Financeira Protegida &copy; {CURRENT_YEAR}
+        Sistema de Gestão Financeira Protegida &copy; {CURRENT_YEAR}
       </footer>
     </div>
   );
