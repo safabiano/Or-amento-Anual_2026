@@ -102,9 +102,9 @@ const App: React.FC = () => {
   }, [monthData]);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
+    <div className="min-h-screen sm:min-h-[100dvh] bg-slate-50 flex flex-col antialiased">
       {/* Header */}
-      <header className="bg-indigo-700 text-white shadow-lg sticky top-0 z-50">
+      <header className="bg-indigo-700 text-white shadow-lg sticky top-0 z-50 backdrop-blur-md bg-opacity-95">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <div className="p-2 bg-white/20 rounded-lg shrink-0">
@@ -121,13 +121,13 @@ const App: React.FC = () => {
           <div className="flex bg-white/10 p-1 rounded-xl w-full sm:w-auto overflow-hidden">
             <button
               onClick={() => setActiveTab('month')}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${activeTab === 'month' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:bg-white/10'}`}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${activeTab === 'month' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:bg-white/10'}`}
             >
               Visão Mensal
             </button>
             <button
               onClick={() => setActiveTab('year')}
-              className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-all ${activeTab === 'year' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:bg-white/10'}`}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${activeTab === 'year' ? 'bg-white text-indigo-700 shadow-sm' : 'hover:bg-white/10'}`}
             >
               Visão Anual
             </button>
@@ -138,17 +138,17 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 sm:mt-8 w-full flex-1 mb-12">
         {/* Top Summary Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border-l-4 border-emerald-500 transition-transform hover:scale-[1.02]">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border-l-4 border-emerald-500 hover:shadow-md transition-all">
             <p className="text-[10px] sm:text-xs uppercase tracking-wider font-bold text-slate-400 mb-1">Total Renda Anual</p>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-800">{CURRENCY_FORMATTER.format(totalAnnualIncome)}</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">{CURRENCY_FORMATTER.format(totalAnnualIncome)}</h2>
           </div>
-          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border-l-4 border-rose-500 transition-transform hover:scale-[1.02]">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border-l-4 border-rose-500 hover:shadow-md transition-all">
             <p className="text-[10px] sm:text-xs uppercase tracking-wider font-bold text-slate-400 mb-1">Total Despesa Anual</p>
-            <h2 className="text-xl sm:text-2xl font-black text-slate-800">{CURRENCY_FORMATTER.format(totalAnnualExpenses)}</h2>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight">{CURRENCY_FORMATTER.format(totalAnnualExpenses)}</h2>
           </div>
-          <div className={`bg-white p-5 sm:p-6 rounded-2xl shadow-sm border-l-4 transition-transform hover:scale-[1.02] ${totalAnnualBalance >= 0 ? 'border-indigo-500' : 'border-amber-500'}`}>
+          <div className={`bg-white p-5 sm:p-6 rounded-2xl shadow-sm border-l-4 hover:shadow-md transition-all ${totalAnnualBalance >= 0 ? 'border-indigo-500' : 'border-amber-500'}`}>
             <p className="text-[10px] sm:text-xs uppercase tracking-wider font-bold text-slate-400 mb-1">Saldo Líquido Anual</p>
-            <h2 className={`text-xl sm:text-2xl font-black ${totalAnnualBalance >= 0 ? 'text-indigo-700' : 'text-amber-700'}`}>
+            <h2 className={`text-xl sm:text-2xl font-black tracking-tight ${totalAnnualBalance >= 0 ? 'text-indigo-700' : 'text-amber-700'}`}>
               {CURRENCY_FORMATTER.format(totalAnnualBalance)}
             </h2>
           </div>
@@ -156,7 +156,7 @@ const App: React.FC = () => {
 
         {activeTab === 'month' ? (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* Month Selector */}
+            {/* Month Selector - Native-like touch scroll */}
             <div className="relative group">
               <div className="flex overflow-x-auto gap-2 pb-4 pt-1 px-1 scrollbar-hide snap-x touch-pan-x">
                 {MONTHS.map((name, idx) => (
@@ -173,11 +173,11 @@ const App: React.FC = () => {
                   </button>
                 ))}
               </div>
-              <div className="absolute right-0 top-0 bottom-4 w-8 bg-gradient-to-l from-slate-50 to-transparent pointer-events-none sm:hidden"></div>
+              <div className="absolute right-0 top-0 bottom-4 w-12 bg-gradient-to-l from-slate-50 to-transparent pointer-events-none sm:hidden"></div>
             </div>
 
             {/* Monthly Insights Section */}
-            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-5 sm:p-8 rounded-2xl border border-indigo-100 flex flex-col md:flex-row items-center gap-6">
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 p-5 sm:p-8 rounded-2xl border border-indigo-100 flex flex-col md:flex-row items-center gap-6 shadow-inner">
               <div className="flex-1 text-center md:text-left">
                 <h3 className="text-base sm:text-lg font-black text-indigo-900 mb-2 flex items-center justify-center md:justify-start gap-2">
                   <span className="p-1.5 bg-indigo-200 text-indigo-700 rounded-lg">
@@ -185,11 +185,11 @@ const App: React.FC = () => {
                       <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71L12 2z" />
                     </svg>
                   </span>
-                  Insights do Gemini
+                  AI Insights
                 </h3>
-                <p className="text-sm text-indigo-700 mb-4 md:mb-0">Dicas inteligentes para o seu mês de {MONTHS[currentMonth]}.</p>
+                <p className="text-sm text-indigo-700 mb-4 md:mb-0">Sua análise financeira inteligente para {MONTHS[currentMonth]}.</p>
                 {insights && (
-                  <div className="mt-4 p-5 bg-white/80 rounded-2xl text-sm text-slate-700 leading-relaxed border border-white shadow-sm text-left">
+                  <div className="mt-4 p-5 bg-white/80 rounded-2xl text-sm text-slate-700 leading-relaxed border border-white shadow-sm text-left backdrop-blur-sm">
                     {insights}
                   </div>
                 )}
@@ -197,14 +197,14 @@ const App: React.FC = () => {
               <button
                 onClick={handleGetInsights}
                 disabled={isGeneratingInsights}
-                className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95"
+                className="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white px-8 py-3.5 rounded-2xl font-bold transition-all shadow-xl shadow-indigo-200 flex items-center justify-center gap-2 active:scale-95 touch-manipulation"
               >
                 {isGeneratingInsights ? (
                   <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
-                ) : 'Analisar Agora'}
+                ) : 'Obter Dicas'}
               </button>
             </div>
 
@@ -228,34 +228,35 @@ const App: React.FC = () => {
               />
             </div>
 
-            {/* Monthly Mini Chart */}
+            {/* Monthly Chart Container */}
             {expenseByCategory.length > 0 && (
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <h3 className="text-lg font-black text-slate-800 mb-6 flex items-center gap-2">
                   <div className="w-2 h-6 bg-indigo-500 rounded-full"></div>
-                  Composição de Despesas
+                  Onde foi o dinheiro?
                 </h3>
-                <div className="w-full" style={{ height: '350px', minHeight: '350px' }}>
+                <div className="w-full relative" style={{ height: '350px', minHeight: '350px' }}>
                   <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                     <PieChart>
                       <Pie
                         data={expenseByCategory}
                         cx="50%"
                         cy="50%"
-                        innerRadius={window.innerWidth < 640 ? 50 : 70}
-                        outerRadius={window.innerWidth < 640 ? 85 : 110}
-                        paddingAngle={5}
+                        innerRadius={window.innerWidth < 640 ? 60 : 80}
+                        outerRadius={window.innerWidth < 640 ? 95 : 120}
+                        paddingAngle={4}
                         dataKey="value"
+                        animationDuration={800}
                       >
                         {expenseByCategory.map((_, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} strokeWidth={0} />
                         ))}
                       </Pie>
                       <Tooltip 
                         formatter={(value) => CURRENCY_FORMATTER.format(value as number)}
-                        contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}}
+                        contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontSize: '12px'}}
                       />
-                      <Legend verticalAlign="bottom" align="center" iconType="circle" />
+                      <Legend verticalAlign="bottom" align="center" iconType="circle" wrapperStyle={{ fontSize: '11px', paddingTop: '20px' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -264,49 +265,49 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6 sm:space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Annual Chart */}
-            <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200">
+            {/* Annual Chart Container */}
+            <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <h3 className="text-lg sm:text-xl font-black text-slate-800 mb-6 sm:mb-8 flex items-center gap-2">
                  <div className="w-2 h-6 bg-indigo-500 rounded-full"></div>
-                 Fluxo de Caixa {currentYear}
+                 Evolução Anual
               </h3>
-              <div className="w-full overflow-hidden" style={{ height: '400px', minHeight: '400px' }}>
+              <div className="w-full relative" style={{ height: '400px', minHeight: '400px' }}>
                 <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-                  <BarChart data={annualSummary} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <BarChart data={annualSummary} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis 
                       dataKey="name" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{fill: '#64748b', fontSize: 10, fontWeight: 700}} 
+                      tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} 
                       dy={10} 
                     />
                     <YAxis 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{fill: '#64748b', fontSize: 10}} 
-                      tickFormatter={(val) => `R$${val >= 1000 ? val/1000 + 'k' : val}`} 
+                      tick={{fill: '#94a3b8', fontSize: 10}} 
+                      tickFormatter={(val) => `R$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} 
                     />
                     <Tooltip 
                       formatter={(val) => CURRENCY_FORMATTER.format(val as number)}
-                      contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)'}}
+                      contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)', fontSize: '12px'}}
                       cursor={{fill: '#f8fafc'}}
                     />
-                    <Legend iconType="circle" verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px'}} />
-                    <Bar dataKey="renda" name="Renda" fill="#10b981" radius={[6, 6, 0, 0]} barSize={window.innerWidth < 640 ? 12 : 24} />
-                    <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={window.innerWidth < 640 ? 12 : 24} />
+                    <Legend iconType="circle" verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px', fontSize: '11px'}} />
+                    <Bar dataKey="renda" name="Renda" fill="#10b981" radius={[6, 6, 0, 0]} barSize={window.innerWidth < 640 ? 12 : 28} />
+                    <Bar dataKey="despesa" name="Despesa" fill="#ef4444" radius={[6, 6, 0, 0]} barSize={window.innerWidth < 640 ? 12 : 28} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* Summary Table Consolidated */}
+            {/* Consolidado Table */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="px-6 py-5 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
                 <div className="w-2 h-5 bg-indigo-400 rounded-full"></div>
-                <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Tabela Consolidada</h3>
+                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Resumo Consolidado</h3>
               </div>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scrollbar-hide">
                 <table className="w-full text-xs sm:text-sm text-left">
                   <thead className="text-[10px] sm:text-xs text-slate-400 uppercase bg-slate-50/50">
                     <tr>
@@ -328,9 +329,9 @@ const App: React.FC = () => {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-indigo-50/50 font-bold text-slate-900 border-t-2 border-slate-200">
+                  <tfoot className="bg-indigo-50/50 font-bold text-slate-900 border-t border-slate-200">
                     <tr>
-                      <td className="px-6 py-5 uppercase text-[10px] tracking-tighter">TOTAL ANUAL</td>
+                      <td className="px-6 py-5 uppercase text-[10px] tracking-tight">Consolidado</td>
                       <td className="px-6 py-5 text-right text-emerald-700 whitespace-nowrap">{CURRENCY_FORMATTER.format(totalAnnualIncome)}</td>
                       <td className="px-6 py-5 text-right text-rose-700 whitespace-nowrap">{CURRENCY_FORMATTER.format(totalAnnualExpenses)}</td>
                       <td className={`px-6 py-5 text-right font-black whitespace-nowrap ${totalAnnualBalance >= 0 ? 'text-indigo-800' : 'text-amber-800'}`}>
@@ -345,11 +346,14 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Footer Info */}
-      <footer className="max-w-7xl mx-auto px-4 py-8 text-center border-t border-slate-200 w-full bg-white sm:bg-transparent">
-        <p className="text-[10px] sm:text-xs text-slate-400 font-medium">
-          © {new Date().getFullYear()} Gestor Financeiro Anual • Privacidade Garantida (LocalStorage)
-        </p>
+      {/* Footer */}
+      <footer className="max-w-7xl mx-auto px-4 py-10 text-center border-t border-slate-200 w-full">
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase tracking-widest">
+            FinancialPro {currentYear} • macOS & iOS Optimized
+          </p>
+          <p className="text-[9px] text-slate-300">Seus dados residem apenas localmente.</p>
+        </div>
       </footer>
     </div>
   );
