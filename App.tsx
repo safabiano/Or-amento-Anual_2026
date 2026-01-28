@@ -18,8 +18,10 @@ import {
   Cell
 } from 'recharts';
 
+const CURRENT_YEAR = 2024;
+
 const INITIAL_BUDGET: AnnualBudget = {
-  2024: Array.from({ length: 12 }, (_, i) => ({
+  [CURRENT_YEAR]: Array.from({ length: 12 }, (_, i) => ({
     month: i,
     income: [],
     expenses: []
@@ -30,26 +32,40 @@ const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'
 
 const App: React.FC = () => {
   const [budget, setBudget] = useState<AnnualBudget>(() => {
-    const saved = localStorage.getItem('budget_data_v1');
-    return saved ? JSON.parse(saved) : INITIAL_BUDGET;
+    try {
+      const saved = localStorage.getItem('budget_data_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Garante que o ano atual existe no objeto recuperado
+        if (parsed[CURRENT_YEAR]) return parsed;
+      }
+    } catch (e) {
+      console.warn("Falha ao carregar dados locais, reiniciando planilha.");
+    }
+    return INITIAL_BUDGET;
   });
   
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear] = useState(2024);
   const [activeTab, setActiveTab] = useState<'month' | 'year'>('month');
   const [insights, setInsights] = useState<string | null>(null);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  // Evita problemas de hidratação e garante que o gráfico renderize após o mount
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('budget_data_v1', JSON.stringify(budget));
   }, [budget]);
 
   const monthData = useMemo(() => {
-    return budget[currentYear].find(m => m.month === currentMonth) || budget[currentYear][0];
-  }, [budget, currentMonth, currentYear]);
+    return budget[CURRENT_YEAR].find(m => m.month === currentMonth) || budget[CURRENT_YEAR][0];
+  }, [budget, currentMonth]);
 
   const annualSummary = useMemo(() => {
-    return budget[currentYear].map(m => {
+    return budget[CURRENT_YEAR].map(m => {
       const income = m.income.reduce((sum, item) => sum + item.amount, 0);
       const expenses = m.expenses.reduce((sum, item) => sum + item.amount, 0);
       return {
@@ -59,7 +75,7 @@ const App: React.FC = () => {
         saldo: income - expenses
       };
     });
-  }, [budget, currentYear]);
+  }, [budget]);
 
   const totalAnnualIncome = annualSummary.reduce((sum, item) => sum + item.renda, 0);
   const totalAnnualExpenses = annualSummary.reduce((sum, item) => sum + item.despesa, 0);
@@ -68,19 +84,19 @@ const App: React.FC = () => {
   const handleAddEntry = (type: 'income' | 'expenses', entry: Omit<BudgetEntry, 'id'>) => {
     setBudget(prev => {
       const newBudget = { ...prev };
-      const monthIdx = newBudget[currentYear].findIndex(m => m.month === currentMonth);
+      const monthIdx = newBudget[CURRENT_YEAR].findIndex(m => m.month === currentMonth);
       const newEntry = { ...entry, id: crypto.randomUUID() };
-      newBudget[currentYear][monthIdx][type].push(newEntry);
-      return newBudget;
+      newBudget[CURRENT_YEAR][monthIdx][type].push(newEntry);
+      return { ...newBudget };
     });
   };
 
   const handleDeleteEntry = (type: 'income' | 'expenses', id: string) => {
     setBudget(prev => {
       const newBudget = { ...prev };
-      const monthIdx = newBudget[currentYear].findIndex(m => m.month === currentMonth);
-      newBudget[currentYear][monthIdx][type] = newBudget[currentYear][monthIdx][type].filter(e => e.id !== id);
-      return newBudget;
+      const monthIdx = newBudget[CURRENT_YEAR].findIndex(m => m.month === currentMonth);
+      newBudget[CURRENT_YEAR][monthIdx][type] = newBudget[CURRENT_YEAR][monthIdx][type].filter(e => e.id !== id);
+      return { ...newBudget };
     });
   };
 
@@ -88,7 +104,7 @@ const App: React.FC = () => {
     setIsGeneratingInsights(true);
     const summary = annualSummary.map(s => `${s.name}: Renda ${s.renda}, Despesa ${s.despesa}`).join('; ');
     const res = await getFinancialInsights(summary);
-    setInsights(res || "Erro ao processar.");
+    setInsights(res);
     setIsGeneratingInsights(false);
   };
 
@@ -100,19 +116,21 @@ const App: React.FC = () => {
     return Object.entries(categories).map(([name, value]) => ({ name, value }));
   }, [monthData]);
 
+  if (!isMounted) return null;
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col antialiased selection:bg-indigo-100">
+    <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
       <header className="bg-indigo-700 text-white shadow-lg sticky top-0 z-50 backdrop-blur-xl bg-opacity-90 border-b border-indigo-600/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
-            <div className="p-2 bg-white/20 rounded-xl shrink-0 backdrop-blur-md">
+            <div className="p-2 bg-white/20 rounded-xl shrink-0">
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
             </div>
             <div className="flex flex-col">
-              <h1 className="text-lg font-black tracking-tight leading-tight">FinancialPro {currentYear}</h1>
-              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Gestão Patrimonial</p>
+              <h1 className="text-lg font-black tracking-tight leading-tight">FinancialPro {CURRENT_YEAR}</h1>
+              <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Dashboard Financeiro</p>
             </div>
           </div>
 
@@ -135,16 +153,16 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full flex-1 mb-12">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
-            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Entradas Totais</p>
+          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 transition-transform hover:scale-[1.01]">
+            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Entradas Anuais</p>
             <h2 className="text-2xl font-black text-emerald-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualIncome)}</h2>
           </div>
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
-            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saídas Totais</p>
+          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 transition-transform hover:scale-[1.01]">
+            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saídas Anuais</p>
             <h2 className="text-2xl font-black text-rose-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualExpenses)}</h2>
           </div>
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
-            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saldo Geral</p>
+          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 transition-transform hover:scale-[1.01]">
+            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saldo em Conta</p>
             <h2 className={`text-2xl font-black tracking-tighter ${totalAnnualBalance >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
               {CURRENCY_FORMATTER.format(totalAnnualBalance)}
             </h2>
@@ -160,7 +178,7 @@ const App: React.FC = () => {
                   onClick={() => setCurrentMonth(idx)}
                   className={`flex-shrink-0 px-6 py-3 rounded-2xl text-xs font-bold transition-all snap-start border ${
                     currentMonth === idx 
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-[1.02]' 
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' 
                     : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'
                   }`}
                 >
@@ -179,7 +197,7 @@ const App: React.FC = () => {
                 onDelete={(id) => handleDeleteEntry('income', id)}
               />
               <BudgetTable
-                title={`Gastos • ${MONTHS[currentMonth]}`}
+                title={`Saídas • ${MONTHS[currentMonth]}`}
                 type="expense"
                 entries={monthData.expenses}
                 categories={EXPENSE_CATEGORIES}
@@ -190,9 +208,9 @@ const App: React.FC = () => {
 
             {expenseByCategory.length > 0 && (
               <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200/60">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Composição de Gastos</h3>
-                <div className="w-full" style={{ height: 350 }}>
-                  <ResponsiveContainer width="100%" height="100%" debounce={50}>
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Composição do Mês</h3>
+                <div className="w-full" style={{ height: 350, minHeight: 300 }}>
+                  <ResponsiveContainer width="100%" height="100%" debounce={100}>
                     <PieChart>
                       <Pie
                         data={expenseByCategory}
@@ -203,6 +221,8 @@ const App: React.FC = () => {
                         paddingAngle={8}
                         dataKey="value"
                         stroke="none"
+                        animationBegin={0}
+                        animationDuration={1000}
                       >
                         {expenseByCategory.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -222,9 +242,9 @@ const App: React.FC = () => {
         ) : (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200/60 overflow-hidden">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Fluxo de Caixa Anual</h3>
-              <div className="w-full" style={{ height: 400 }}>
-                <ResponsiveContainer width="100%" height="100%" debounce={50}>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Desempenho Anual</h3>
+              <div className="w-full" style={{ height: 400, minHeight: 300 }}>
+                <ResponsiveContainer width="100%" height="100%" debounce={100}>
                   <BarChart data={annualSummary} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={10} />
@@ -243,7 +263,7 @@ const App: React.FC = () => {
 
             <div className="bg-white rounded-[32px] shadow-sm border border-slate-200/60 overflow-hidden">
               <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100">
-                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Resumo Consolidado</h3>
+                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Tabela Comparativa</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left">
@@ -252,7 +272,7 @@ const App: React.FC = () => {
                       <th className="px-8 py-4 font-bold">Mês</th>
                       <th className="px-8 py-4 text-right font-bold">Renda</th>
                       <th className="px-8 py-4 text-right font-bold">Gasto</th>
-                      <th className="px-8 py-4 text-right font-bold">Resultado</th>
+                      <th className="px-8 py-4 text-right font-bold">Saldo</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
@@ -274,10 +294,8 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <footer className="py-12 text-center">
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
-          FinancialPro &copy; {new Date().getFullYear()} • Otimizado para macOS & iOS
-        </p>
+      <footer className="py-12 text-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
+        FinancialPro &copy; {new Date().getFullYear()} • Local Storage Mode
       </footer>
     </div>
   );

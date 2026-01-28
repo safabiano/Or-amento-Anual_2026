@@ -1,10 +1,14 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 export const getFinancialInsights = async (annualData: any) => {
   try {
+    const apiKey = typeof process !== 'undefined' ? process.env.API_KEY : '';
+    if (!apiKey) {
+      return "Configure uma chave de API para obter insights inteligentes.";
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: `Analise este resumo financeiro anual e forneça 3 dicas práticas em português para melhorar a saúde financeira. Responda apenas com as dicas em formato markdown curto. Dados: ${JSON.stringify(annualData)}`,
@@ -12,9 +16,10 @@ export const getFinancialInsights = async (annualData: any) => {
         thinkingConfig: { thinkingBudget: 0 }
       }
     });
-    return response.text;
+    
+    return response.text || "Sem recomendações no momento.";
   } catch (error) {
     console.error("Erro ao obter insights:", error);
-    return "Não foi possível carregar os insights no momento. Verifique sua conexão ou tente novamente mais tarde.";
+    return "O assistente está temporariamente indisponível.";
   }
 };
