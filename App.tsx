@@ -37,48 +37,90 @@ const App: React.FC = () => {
   const [isMounted, setIsMounted] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
-  // Função para comprimir e gerar link
+  // Função para comprimir os dados em uma estrutura mínima (link reduzido)
   const handleShare = () => {
     try {
-      const dataString = JSON.stringify(budget);
+      // Estrutura compacta: [ [mês, [[catIdx, desc, valor],...], [[catIdx, desc, valor],...]], ... ]
+      const compactData = budget[CURRENT_YEAR]
+        .filter(m => m.income.length > 0 || m.expenses.length > 0)
+        .map(m => [
+          m.month,
+          m.income.map(i => [INCOME_CATEGORIES.indexOf(i.category), i.description, i.amount]),
+          m.expenses.map(e => [EXPENSE_CATEGORIES.indexOf(e.category), e.description, e.amount])
+        ]);
+
+      const dataString = JSON.stringify(compactData);
+      // Usando btoa para codificar. Para links ainda menores, removemos espaços desnecessários do JSON.
       const encodedData = btoa(encodeURIComponent(dataString));
-      const shareUrl = `${window.location.origin}${window.location.pathname}#data=${encodedData}`;
+      const shareUrl = `${window.location.origin}${window.location.pathname}#v2=${encodedData}`;
       
       navigator.clipboard.writeText(shareUrl).then(() => {
         setShowToast(true);
         setTimeout(() => setShowToast(false), 3000);
       });
     } catch (e) {
-      alert("Erro ao gerar link de compartilhamento. Os dados podem estar muito grandes.");
+      alert("Erro ao gerar link reduzido. Tente remover alguns lançamentos antigos.");
     }
   };
 
   useEffect(() => {
     setIsMounted(true);
     
-    // 1. Tentar carregar dados da URL (Prioridade)
     const hash = window.location.hash;
+    
+    // Suporte para a nova versão compacta (v2)
+    if (hash.startsWith('#v2=')) {
+      try {
+        const encodedData = hash.replace('#v2=', '');
+        const decodedData = decodeURIComponent(atob(encodedData));
+        const compactData = JSON.parse(decodedData) as any[];
+        
+        const newBudget: AnnualBudget = JSON.parse(JSON.stringify(INITIAL_BUDGET));
+        
+        compactData.forEach(([monthIdx, incomeArr, expenseArr]) => {
+          const mIdx = newBudget[CURRENT_YEAR].findIndex(m => m.month === monthIdx);
+          if (mIdx !== -1) {
+            newBudget[CURRENT_YEAR][mIdx].income = incomeArr.map(([catIdx, desc, val]: any) => ({
+              id: crypto.randomUUID(),
+              category: INCOME_CATEGORIES[catIdx] || INCOME_CATEGORIES[0],
+              description: desc,
+              amount: val
+            }));
+            newBudget[CURRENT_YEAR][mIdx].expenses = expenseArr.map(([catIdx, desc, val]: any) => ({
+              id: crypto.randomUUID(),
+              category: EXPENSE_CATEGORIES[catIdx] || EXPENSE_CATEGORIES[0],
+              description: desc,
+              amount: val
+            }));
+          }
+        });
+
+        const confirmImport = window.confirm("Dados compactos detectados! Deseja carregar esta versão sincronizada?");
+        if (confirmImport) {
+          setBudget(newBudget);
+          window.history.replaceState(null, "", window.location.pathname);
+          return;
+        }
+      } catch (e) {
+        console.error("Erro ao processar link reduzido v2");
+      }
+    }
+
+    // Suporte legado (v1) para não quebrar links antigos já gerados
     if (hash.startsWith('#data=')) {
       try {
         const encodedData = hash.replace('#data=', '');
         const decodedData = decodeURIComponent(atob(encodedData));
         const parsedBudget = JSON.parse(decodedData);
-        
         if (parsedBudget[CURRENT_YEAR]) {
-          const confirmImport = window.confirm("Dados detectados no link! Deseja carregar esta versão da planilha? (Isso substituirá seus dados locais atuais)");
-          if (confirmImport) {
-            setBudget(parsedBudget);
-            // Limpa o hash para evitar recargas acidentais
-            window.history.replaceState(null, "", window.location.pathname);
-            return;
-          }
+          setBudget(parsedBudget);
+          window.history.replaceState(null, "", window.location.pathname);
+          return;
         }
-      } catch (e) {
-        console.error("Erro ao processar dados da URL");
-      }
+      } catch (e) {}
     }
 
-    // 2. Se não houver dados na URL, carregar do LocalStorage
+    // Carregar do LocalStorage se não houver link
     try {
       const saved = localStorage.getItem('budget_data_v1');
       if (saved) {
@@ -87,9 +129,7 @@ const App: React.FC = () => {
           setBudget(parsed);
         }
       }
-    } catch (e) {
-      console.warn("Falha ao carregar dados locais.");
-    }
+    } catch (e) {}
   }, []);
 
   useEffect(() => {
@@ -150,11 +190,10 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
-      {/* Toast Notification */}
       {showToast && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-3 rounded-full text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-2">
           <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
-          Link de sincronização copiado!
+          Link reduzido copiado!
         </div>
       )}
 
@@ -172,11 +211,11 @@ const App: React.FC = () => {
             </div>
             <button 
               onClick={handleShare}
-              className="ml-2 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors group relative"
-              title="Compartilhar link desta versão"
+              className="ml-2 p-2 bg-emerald-500 hover:bg-emerald-600 rounded-lg transition-all shadow-md active:scale-90"
+              title="Gerar Link Reduzido"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
             </button>
           </div>
@@ -203,9 +242,12 @@ const App: React.FC = () => {
           <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <p className="text-xs text-amber-800 font-medium leading-relaxed">
-            <strong>Dica de Sincronização:</strong> Como os dados são salvos no seu navegador, para que outras pessoas vejam suas atualizações, você deve clicar no ícone de <span className="inline-block px-1.5 py-0.5 bg-amber-100 rounded">compartilhar</span> no topo e enviar o novo link.
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-amber-800 font-bold leading-relaxed">Sincronização via Link Reduzido</p>
+            <p className="text-[11px] text-amber-700 leading-relaxed">
+              Otimizamos o compartilhamento! Agora os links são menores e mais rápidos. Clique no ícone verde de compartilhar no topo para enviar sua versão atualizada.
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
