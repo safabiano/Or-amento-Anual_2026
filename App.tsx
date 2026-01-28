@@ -36,11 +36,10 @@ const App: React.FC = () => {
       const saved = localStorage.getItem('budget_data_v1');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // Garante que o ano atual existe no objeto recuperado
         if (parsed[CURRENT_YEAR]) return parsed;
       }
     } catch (e) {
-      console.warn("Falha ao carregar dados locais, reiniciando planilha.");
+      console.warn("Falha ao carregar dados locais.");
     }
     return INITIAL_BUDGET;
   });
@@ -51,14 +50,15 @@ const App: React.FC = () => {
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  // Evita problemas de hidratação e garante que o gráfico renderize após o mount
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('budget_data_v1', JSON.stringify(budget));
-  }, [budget]);
+    if (isMounted) {
+      localStorage.setItem('budget_data_v1', JSON.stringify(budget));
+    }
+  }, [budget, isMounted]);
 
   const monthData = useMemo(() => {
     return budget[CURRENT_YEAR].find(m => m.month === currentMonth) || budget[CURRENT_YEAR][0];
@@ -116,7 +116,7 @@ const App: React.FC = () => {
     return Object.entries(categories).map(([name, value]) => ({ name, value }));
   }, [monthData]);
 
-  if (!isMounted) return null;
+  if (!isMounted) return <div className="flex items-center justify-center h-screen text-indigo-600 font-bold">Iniciando...</div>;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
@@ -153,16 +153,16 @@ const App: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full flex-1 mb-12">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 transition-transform hover:scale-[1.01]">
+          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
             <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Entradas Anuais</p>
             <h2 className="text-2xl font-black text-emerald-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualIncome)}</h2>
           </div>
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 transition-transform hover:scale-[1.01]">
+          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
             <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saídas Anuais</p>
             <h2 className="text-2xl font-black text-rose-600 tracking-tighter">{CURRENCY_FORMATTER.format(totalAnnualExpenses)}</h2>
           </div>
-          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60 transition-transform hover:scale-[1.01]">
-            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saldo em Conta</p>
+          <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
+            <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Saldo Geral</p>
             <h2 className={`text-2xl font-black tracking-tighter ${totalAnnualBalance >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
               {CURRENCY_FORMATTER.format(totalAnnualBalance)}
             </h2>
@@ -170,7 +170,7 @@ const App: React.FC = () => {
         </div>
 
         {activeTab === 'month' ? (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+          <div className="space-y-6 animate-in fade-in duration-500">
             <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide snap-x">
               {MONTHS.map((name, idx) => (
                 <button
@@ -179,7 +179,7 @@ const App: React.FC = () => {
                   className={`flex-shrink-0 px-6 py-3 rounded-2xl text-xs font-bold transition-all snap-start border ${
                     currentMonth === idx 
                     ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' 
-                    : 'bg-white text-slate-500 border-slate-200 hover:border-indigo-200'
+                    : 'bg-white text-slate-500 border-slate-200'
                   }`}
                 >
                   {name}
@@ -209,8 +209,8 @@ const App: React.FC = () => {
             {expenseByCategory.length > 0 && (
               <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200/60">
                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Composição do Mês</h3>
-                <div className="w-full" style={{ height: 350, minHeight: 300 }}>
-                  <ResponsiveContainer width="100%" height="100%" debounce={100}>
+                <div className="w-full h-[350px]">
+                  <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
                         data={expenseByCategory}
@@ -221,8 +221,6 @@ const App: React.FC = () => {
                         paddingAngle={8}
                         dataKey="value"
                         stroke="none"
-                        animationBegin={0}
-                        animationDuration={1000}
                       >
                         {expenseByCategory.map((_, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -240,11 +238,11 @@ const App: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="space-y-6 animate-in fade-in duration-700">
             <div className="bg-white p-8 rounded-[32px] shadow-sm border border-slate-200/60 overflow-hidden">
-              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Desempenho Anual</h3>
-              <div className="w-full" style={{ height: 400, minHeight: 300 }}>
-                <ResponsiveContainer width="100%" height="100%" debounce={100}>
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-8">Fluxo Anual</h3>
+              <div className="w-full h-[400px]">
+                <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={annualSummary} margin={{ top: 20, right: 0, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 10, fontWeight: 700}} dy={10} />
@@ -260,42 +258,12 @@ const App: React.FC = () => {
                 </ResponsiveContainer>
               </div>
             </div>
-
-            <div className="bg-white rounded-[32px] shadow-sm border border-slate-200/60 overflow-hidden">
-              <div className="px-8 py-6 bg-slate-50/50 border-b border-slate-100">
-                <h3 className="font-black text-slate-800 uppercase text-[10px] tracking-widest">Tabela Comparativa</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-[10px] text-slate-400 uppercase tracking-widest bg-slate-50/30">
-                    <tr>
-                      <th className="px-8 py-4 font-bold">Mês</th>
-                      <th className="px-8 py-4 text-right font-bold">Renda</th>
-                      <th className="px-8 py-4 text-right font-bold">Gasto</th>
-                      <th className="px-8 py-4 text-right font-bold">Saldo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {annualSummary.map((m, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                        <td className="px-8 py-4 font-bold text-slate-700">{MONTHS[idx]}</td>
-                        <td className="px-8 py-4 text-right text-emerald-600 font-medium">{CURRENCY_FORMATTER.format(m.renda)}</td>
-                        <td className="px-8 py-4 text-right text-rose-600 font-medium">{CURRENCY_FORMATTER.format(m.despesa)}</td>
-                        <td className={`px-8 py-4 text-right font-black ${m.saldo >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
-                          {CURRENCY_FORMATTER.format(m.saldo)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         )}
       </main>
 
       <footer className="py-12 text-center text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
-        FinancialPro &copy; {new Date().getFullYear()} • Local Storage Mode
+        FinancialPro &copy; {new Date().getFullYear()}
       </footer>
     </div>
   );
