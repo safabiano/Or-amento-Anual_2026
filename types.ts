@@ -6,6 +6,7 @@ export interface BudgetEntry {
   category: string;
   description: string;
   amount: number;
+  paid: boolean; // True para Pago/Recebido, False para Pendente
 }
 
 export interface MonthlyData {

@@ -10,9 +10,10 @@ interface BudgetTableProps {
   type: 'income' | 'expense';
   onAdd: (entry: Omit<BudgetEntry, 'id'>) => void;
   onDelete: (id: string) => void;
+  onToggleStatus?: (id: string) => void;
 }
 
-const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, type, onAdd, onDelete }) => {
+const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, type, onAdd, onDelete, onToggleStatus }) => {
   const [newEntry, setNewEntry] = useState({ category: categories[0], description: '', amount: 0 });
   const [customCategory, setCustomCategory] = useState('');
   const [isCustom, setIsCustom] = useState(false);
@@ -34,7 +35,8 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, t
     if (finalCategory && newEntry.description && newEntry.amount > 0) {
       onAdd({
         ...newEntry,
-        category: finalCategory
+        category: finalCategory,
+        paid: type === 'income' // Entradas costumam ser consideradas recebidas por padrão
       });
       setNewEntry({ category: categories[0], description: '', amount: 0 });
       setCustomCategory('');
@@ -139,15 +141,31 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, t
             <table className="min-w-full text-sm text-left">
               <thead className="text-[10px] text-slate-400 uppercase tracking-widest bg-slate-50/30">
                 <tr>
+                  <th className="px-4 py-3 font-bold">Status</th>
                   <th className="px-4 py-3 font-bold">Cat.</th>
                   <th className="px-4 py-3 font-bold">Descrição</th>
                   <th className="px-4 py-3 text-right font-bold">Valor</th>
-                  <th className="px-4 py-3 text-right font-bold">Excluir</th>
+                  <th className="px-4 py-3 text-right font-bold">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {entries.map((entry) => (
-                  <tr key={entry.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={entry.id} className={`hover:bg-slate-50/50 transition-colors ${entry.paid ? 'bg-emerald-50/20' : ''}`}>
+                    <td className="px-4 py-4">
+                      <button 
+                        onClick={() => onToggleStatus?.(entry.id)}
+                        className={`p-1.5 rounded-lg transition-all border ${
+                          entry.paid 
+                            ? 'bg-emerald-100 border-emerald-200 text-emerald-600' 
+                            : 'bg-slate-100 border-slate-200 text-slate-400'
+                        }`}
+                        title={entry.paid ? 'Marcar como Pendente' : 'Marcar como Pago'}
+                      >
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
+                        </svg>
+                      </button>
+                    </td>
                     <td className="px-4 py-4 font-bold text-slate-600 whitespace-nowrap text-xs">
                       <span className="inline-block px-2 py-0.5 bg-slate-100 rounded-md">{entry.category}</span>
                     </td>
@@ -168,7 +186,7 @@ const BudgetTable: React.FC<BudgetTableProps> = ({ title, entries, categories, t
                 ))}
                 {entries.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-4 py-10 text-center text-slate-300 italic text-xs font-medium">
+                    <td colSpan={5} className="px-4 py-10 text-center text-slate-300 italic text-xs font-medium">
                       Sem registros
                     </td>
                   </tr>
