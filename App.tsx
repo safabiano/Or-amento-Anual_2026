@@ -31,27 +31,65 @@ const INITIAL_BUDGET: AnnualBudget = {
 const COLORS = ['#10b981', '#ef4444', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899'];
 
 const App: React.FC = () => {
-  const [budget, setBudget] = useState<AnnualBudget>(() => {
+  const [budget, setBudget] = useState<AnnualBudget>(INITIAL_BUDGET);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [activeTab, setActiveTab] = useState<'month' | 'year'>('month');
+  const [isMounted, setIsMounted] = useState(false);
+  const [showToast, setShowToast] = useState(false);
+
+  // Função para comprimir e gerar link
+  const handleShare = () => {
+    try {
+      const dataString = JSON.stringify(budget);
+      const encodedData = btoa(encodeURIComponent(dataString));
+      const shareUrl = `${window.location.origin}${window.location.pathname}#data=${encodedData}`;
+      
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setShowToast(true);
+        setTimeout(() => setShowToast(false), 3000);
+      });
+    } catch (e) {
+      alert("Erro ao gerar link de compartilhamento. Os dados podem estar muito grandes.");
+    }
+  };
+
+  useEffect(() => {
+    setIsMounted(true);
+    
+    // 1. Tentar carregar dados da URL (Prioridade)
+    const hash = window.location.hash;
+    if (hash.startsWith('#data=')) {
+      try {
+        const encodedData = hash.replace('#data=', '');
+        const decodedData = decodeURIComponent(atob(encodedData));
+        const parsedBudget = JSON.parse(decodedData);
+        
+        if (parsedBudget[CURRENT_YEAR]) {
+          const confirmImport = window.confirm("Dados detectados no link! Deseja carregar esta versão da planilha? (Isso substituirá seus dados locais atuais)");
+          if (confirmImport) {
+            setBudget(parsedBudget);
+            // Limpa o hash para evitar recargas acidentais
+            window.history.replaceState(null, "", window.location.pathname);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Erro ao processar dados da URL");
+      }
+    }
+
+    // 2. Se não houver dados na URL, carregar do LocalStorage
     try {
       const saved = localStorage.getItem('budget_data_v1');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (parsed[CURRENT_YEAR]) return parsed;
+        if (parsed[CURRENT_YEAR]) {
+          setBudget(parsed);
+        }
       }
     } catch (e) {
       console.warn("Falha ao carregar dados locais.");
     }
-    return INITIAL_BUDGET;
-  });
-  
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [activeTab, setActiveTab] = useState<'month' | 'year'>('month');
-  const [insights, setInsights] = useState<string | null>(null);
-  const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
   }, []);
 
   useEffect(() => {
@@ -100,14 +138,6 @@ const App: React.FC = () => {
     });
   };
 
-  const handleGetInsights = async () => {
-    setIsGeneratingInsights(true);
-    const summary = annualSummary.map(s => `${s.name}: Renda ${s.renda}, Despesa ${s.despesa}`).join('; ');
-    const res = await getFinancialInsights(summary);
-    setInsights(res);
-    setIsGeneratingInsights(false);
-  };
-
   const expenseByCategory = useMemo(() => {
     const categories: Record<string, number> = {};
     monthData.expenses.forEach(e => {
@@ -116,10 +146,18 @@ const App: React.FC = () => {
     return Object.entries(categories).map(([name, value]) => ({ name, value }));
   }, [monthData]);
 
-  if (!isMounted) return <div className="flex items-center justify-center h-screen text-indigo-600 font-bold">Iniciando...</div>;
+  if (!isMounted) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col antialiased">
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 text-white px-6 py-3 rounded-full text-sm font-bold shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-2">
+          <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/></svg>
+          Link de sincronização copiado!
+        </div>
+      )}
+
       <header className="bg-indigo-700 text-white shadow-lg sticky top-0 z-50 backdrop-blur-xl bg-opacity-90 border-b border-indigo-600/50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -132,6 +170,15 @@ const App: React.FC = () => {
               <h1 className="text-lg font-black tracking-tight leading-tight">Controle de Despesas e Orçamento {CURRENT_YEAR}</h1>
               <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold opacity-80">Gestão Patrimonial</p>
             </div>
+            <button 
+              onClick={handleShare}
+              className="ml-2 p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors group relative"
+              title="Compartilhar link desta versão"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            </button>
           </div>
 
           <div className="flex bg-black/10 p-1 rounded-2xl w-full sm:w-auto">
@@ -152,6 +199,15 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6 w-full flex-1 mb-12">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-8 flex items-start gap-3">
+          <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-amber-800 font-medium leading-relaxed">
+            <strong>Dica de Sincronização:</strong> Como os dados são salvos no seu navegador, para que outras pessoas vejam suas atualizações, você deve clicar no ícone de <span className="inline-block px-1.5 py-0.5 bg-amber-100 rounded">compartilhar</span> no topo e enviar o novo link.
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
           <div className="bg-white p-6 rounded-[24px] shadow-sm border border-slate-200/60">
             <p className="text-[10px] uppercase tracking-widest font-black text-slate-400 mb-2">Entradas Anuais</p>
